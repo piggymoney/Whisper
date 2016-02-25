@@ -1,7 +1,61 @@
 import UIKit
 import Whisper
 
+extension UINavigationController {
+  public override func whisperYPosition(direction: Direction) -> CGFloat {
+    if direction == .Down{
+      return CGRectGetMaxY(self.navigationBar.frame);
+    }else{
+      return CGRectGetMaxY(self.view.frame);
+    }
+  }
+}
+
 class ViewController: UIViewController {
+  
+  static var direction : Direction = .Down
+  
+  // MARK: contentInset methods
+  
+  deinit {
+    NSNotificationCenter.defaultCenter().removeObserver(self)
+  }
+  
+  init() {
+    super.init(nibName: nil, bundle: nil)
+    NSNotificationCenter.defaultCenter().addObserver(self, selector: "whisperWillAppear:", name:WhisperNotifications.willAppearNotification, object: nil)
+    NSNotificationCenter.defaultCenter().addObserver(self, selector: "whisperWillDisappear:", name:WhisperNotifications.willDisappearNotification, object: nil)
+  }
+  
+  required init?(coder aDecoder: NSCoder) {
+    super.init(coder: aDecoder)
+  }
+  
+  func whisperWillAppear(notification: NSNotification?) {
+    guard let duration = notification?.userInfo?["duration"] as? NSTimeInterval,
+      whisperView = self.navigationController?.whisper else { return }
+    self.animateInsetChange(duration, height: whisperView.calculatedHeight(), direction: whisperView.direction)
+  }
+  
+  func whisperWillDisappear(notification: NSNotification?) {
+    guard let duration = notification?.userInfo?["duration"] as? NSTimeInterval,
+    whisperView = self.navigationController?.whisper else { return }
+    self.animateInsetChange(duration, height: 0, direction: whisperView.direction)
+  }
+  
+  func animateInsetChange(duration: NSTimeInterval, height: CGFloat, direction: Direction) {
+    UIView.animateWithDuration(duration, animations: {
+      var inset = self.scrollView.contentInset
+      if (direction == .Down){
+        inset.top = self.topLayoutGuide.length + height
+      }else if (direction == .Up){
+        inset.bottom = self.bottomLayoutGuide.length + height
+      }
+      self.scrollView.contentInset = inset
+    })
+  }
+  
+  // MARK: UI
 
   lazy var scrollView: UIScrollView = UIScrollView()
 
@@ -23,6 +77,16 @@ class ViewController: UIViewController {
     button.addTarget(self, action: "presentButtonDidPress:", forControlEvents: .TouchUpInside)
     button.setTitle("Present and silent", forState: .Normal)
 
+    return button
+    }()
+  
+  lazy var presentBottomButton: UIButton = { [unowned self] in
+    let button = UIButton()
+    button.addTarget(self, action: "presentBottomButtonDidPress:", forControlEvents: .TouchUpInside)
+    button.setTitle("Present at the bottom and silent", forState: .Normal)
+    button.titleLabel?.numberOfLines = 2
+    button.titleLabel?.textAlignment = .Center
+    
     return button
     }()
 
@@ -83,10 +147,10 @@ class ViewController: UIViewController {
     navigationItem.rightBarButtonItem = nextButton
 
     view.addSubview(scrollView)
-    [titleLabel, presentButton, showButton,
+    [titleLabel, presentButton, presentBottomButton, showButton,
       presentPermanentButton, notificationButton, statusBarButton].forEach { scrollView.addSubview($0) }
 
-    [presentButton, showButton, presentPermanentButton, notificationButton, statusBarButton].forEach {
+    [presentButton, presentBottomButton, showButton, presentPermanentButton, notificationButton, statusBarButton].forEach {
       $0.setTitleColor(UIColor.grayColor(), forState: .Normal)
       $0.layer.borderColor = UIColor.grayColor().CGColor
       $0.layer.borderWidth = 1.5
@@ -100,16 +164,10 @@ class ViewController: UIViewController {
       y: navigationController.navigationBar.frame.maxY - UIApplication.sharedApplication().statusBarFrame.height,
       width: UIScreen.mainScreen().bounds.width, height: 0)
   }
-
-  override func viewDidAppear(animated: Bool) {
-    super.viewDidAppear(animated)
-    setupFrames()
-  }
-
-  // MARK: - Orientation changes
-
-  override func didRotateFromInterfaceOrientation(fromInterfaceOrientation: UIInterfaceOrientation) {
-    setupFrames()
+  
+  override func viewWillLayoutSubviews() {
+    super.viewWillLayoutSubviews()
+    self.setupFrames()
   }
 
   // MARK: Action methods
@@ -119,6 +177,14 @@ class ViewController: UIViewController {
     let message = Message(title: "This message will silent in 3 seconds.", backgroundColor: UIColor(red:0.89, green:0.09, blue:0.44, alpha:1))
 
     Whisper(message, to: navigationController, action: .Present)
+    Silent(navigationController, after: 3)
+  }
+  
+  func presentBottomButtonDidPress(button: UIButton) {
+    guard let navigationController = navigationController else { return }
+    let message = Message(title: "Bottom message that will silent in 3 seconds.", backgroundColor: UIColor(red:0.89, green:0.09, blue:0.44, alpha:1))
+    
+    Whisper(message, to: navigationController, action: .Present, direction: .Up)
     Silent(navigationController, after: 3)
   }
 
@@ -165,7 +231,8 @@ class ViewController: UIViewController {
     scrollView.frame = CGRect(x: 0, y: 0, width: totalSize.width, height: totalSize.height)
     titleLabel.frame.origin = CGPoint(x: (totalSize.width - titleLabel.frame.width) / 2, y: 60)
     presentButton.frame = CGRect(x: 50, y: titleLabel.frame.maxY + 75, width: totalSize.width - 100, height: 50)
-    showButton.frame = CGRect(x: 50, y: presentButton.frame.maxY + 15, width: totalSize.width - 100, height: 50)
+    presentBottomButton.frame = CGRect(x: 50, y: presentButton.frame.maxY + 15, width: totalSize.width - 100, height: 50)
+    showButton.frame = CGRect(x: 50, y: presentBottomButton.frame.maxY + 15, width: totalSize.width - 100, height: 50)
     presentPermanentButton.frame = CGRect(x: 50, y: showButton.frame.maxY + 15, width: totalSize.width - 100, height: 50)
     notificationButton.frame = CGRect(x: 50, y: presentPermanentButton.frame.maxY + 15, width: totalSize.width - 100, height: 50)
     statusBarButton.frame = CGRect(x: 50, y: notificationButton.frame.maxY + 15, width: totalSize.width - 100, height: 50)

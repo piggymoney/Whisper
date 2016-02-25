@@ -33,12 +33,15 @@ public class WhisperView: UIView {
 
   public weak var delegate: NotificationControllerDelegate?
   public var height: CGFloat
+  public var direction: Direction
+  public var isClosing = false
   var whisperImages: [UIImage]?
 
   // MARK: - Initializers
 
-  init(height: CGFloat, message: Message) {
+  init(height: CGFloat, message: Message, direction: Direction) {
     self.height = height
+    self.direction = direction
     self.whisperImages = message.images
     super.init(frame: CGRectZero)
 
@@ -58,12 +61,22 @@ public class WhisperView: UIView {
     for subview in transformViews { addSubview(subview) }
 
     titleLabel.sizeToFit()
-    setupFrames()
     clipsToBounds = true
   }
 
   public required init?(coder aDecoder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+  
+  public override func layoutSubviews() {
+    super.layoutSubviews()
+    if (CGRectGetHeight(self.bounds) > 0){
+      self.setupFrames() 
+    }
+  }
+  
+  public func calculatedHeight() -> CGFloat {
+    return Dimensions.height
   }
 }
 
